@@ -4,10 +4,12 @@
 
 ### *Your AI agent is working. You might as well enjoy the ride.*
 
-**Elevator Music** plays looping hold music while Copilot, Cursor Agent, or other coding agents work — and a satisfying **ding** when they're done.
+**Hold the Vibe** plays looping hold music while Copilot, Cursor Agent, or other coding agents work — and a satisfying **ding** when they're done.
 
 <br />
 
+[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/joenberg.elevator-music?label=Marketplace&logo=visualstudiocode&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/joenberg.elevator-music?label=installs&color=success)](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music)
 [![CI](https://github.com/joenb33/hold-the-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/joenb33/hold-the-vibe/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.96%2B-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
@@ -16,7 +18,7 @@
 
 <br />
 
-[Install in 60 seconds](#-install-in-60-seconds) · [How it works](#-how-it-works) · [Contributing](CONTRIBUTING.md) · [Report a bug](https://github.com/joenb33/hold-the-vibe/issues)
+[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music) · [How it works](#-how-it-works) · [Contributing](CONTRIBUTING.md) · [Report a bug](https://github.com/joenb33/hold-the-vibe/issues)
 
 </div>
 
@@ -24,20 +26,22 @@
 
 ## ✨ Why this exists
 
-You kicked off an agent. You switched tabs. You forgot. Twenty minutes later you wonder if it's still running.
+Watching an AI agent grind through a multi-step task is boring. The cursor blinks, the terminal scrolls, and you just sit there.
 
-**Hold the Vibe** fixes that the fun way:
+**Hold the Vibe** turns that dead time into a bit: the moment your agent starts working, you get looping elevator hold music — because you're basically on hold, except the call center is a language model. That's the whole point of this extension. The completion ding is just a nice bonus so you know when to look back up.
 
 | Moment | What you hear |
 |--------|----------------|
-| Agent **starts** working | Smooth elevator hold music |
-| Agent **finishes** | A crisp completion ding |
+| Agent **starts** working | Smooth elevator hold music — the whole point |
+| Agent **finishes** | A crisp completion ding — the bonus |
 
-No staring at the spinner. No polling the chat. Just vibes.
+No staring at a silent spinner. Just vibes, and a little bell when it's over.
 
 ---
 
 ## 🎬 How it works
+
+By default the extension runs in **Advanced Mode**. Here's what happens during a single agent turn:
 
 ```mermaid
 sequenceDiagram
@@ -45,34 +49,58 @@ sequenceDiagram
     participant Agent as AI Agent
     participant Hook as Editor Hook
     participant Bridge as Local Bridge
-    participant Vibe as Elevator Music
+    participant Vibe as Hold the Vibe
 
     You->>Agent: Submit prompt
     Agent->>Hook: beforeSubmitPrompt / UserPromptSubmit
     Hook->>Bridge: POST /activity/start
-    Bridge->>Vibe: ▶ Hold music
+    Bridge->>Vibe: ▶ Start hold music
     Note over Vibe: 🎵 muzak while you wait...
     Agent->>Hook: stop / Stop
     Hook->>Bridge: POST /activity/stop
-    Bridge->>Vibe: ⏹ Stop + ding
-    Note over Vibe: 🔔 done!
+    Bridge->>Vibe: ⏹ Stop music + ding
+    Vibe-->>You: 🔔 Ding! Go check the result
 ```
 
-**Advanced Mode** (default) uses your editor's agent hooks → a tiny localhost bridge → instant, reliable audio.
+In plain terms:
 
-**Notify Mode** is the zero-setup fallback: LM tools + smart terminal heuristics. Best effort, no hook files.
+1. You send a prompt to your AI agent.
+2. Your editor (VS Code or Cursor) fires a lifecycle "hook" the instant the agent starts working.
+3. A small script forwards that as a message to a tiny local server the extension runs on your own machine — nothing ever leaves your computer.
+4. The extension starts the hold music.
+5. When the agent finishes, the same thing happens in reverse: the music stops and you hear a ding.
+
+The **Hook**, the **Bridge**, and the music player are all just parts of this one extension — the diagram splits them into separate boxes only to make the order of events clearer.
+
+**Advanced Mode** (shown above, and on by default) hooks directly into your editor's agent events, so the music and ding fire reliably on every turn. There's a small, real startup delay the first time audio plays each turn — spinning up the player takes a moment — but it never blocks or slows down the agent itself.
+
+**Notify Mode** is a zero-install fallback for editors or setups where hooks aren't available. Instead of hooks, the AI can call a small "let the user know" tool built into the extension, and a backup check listens for terminal commands wrapping up. No files get written and nothing needs installing — but since it relies on the AI remembering to call that tool, it can occasionally miss a turn, which Advanced Mode doesn't.
 
 ---
 
-## ⚡ Install in 60 seconds
+## ⚡ Install
 
-### Option A — Download a release (easiest)
+### Option A — Marketplace (easiest)
 
-Grab the latest `.vsix` from **[GitHub Releases](https://github.com/joenb33/hold-the-vibe/releases)**.
+Search **Elevator Music** in the Extensions panel, or install directly:
 
-**Extensions** → `⋯` → **Install from VSIX** → select the file. Reload once.
+**[marketplace.visualstudio.com/items?itemName=joenberg.elevator-music](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music)**
 
-### Option B — Build from source
+Or from the command line:
+
+```bash
+code --install-extension joenberg.elevator-music
+# Cursor:
+cursor --install-extension joenberg.elevator-music
+```
+
+> **Cursor users:** if it's not in Cursor's built-in search yet, use the command above or grab the `.vsix` from [Releases](https://github.com/joenb33/hold-the-vibe/releases) and **Command Palette → Extensions: Install from VSIX…**
+
+### Option B — Download a release
+
+Grab the latest `.vsix` from **[GitHub Releases](https://github.com/joenb33/hold-the-vibe/releases)**, then **Command Palette → Extensions: Install from VSIX…** → select the file. Reload once.
+
+### Option C — Build from source
 
 ```bash
 git clone https://github.com/joenb33/hold-the-vibe.git
@@ -84,7 +112,7 @@ npm run package
 
 Install the generated `.vsix` as above.
 
-### Option C — Hack on it
+### Option D — Hack on it
 
 ```bash
 git clone https://github.com/joenb33/hold-the-vibe.git
