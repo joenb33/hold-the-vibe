@@ -1,0 +1,191 @@
+{
+  "name": "elevator-music",
+  "displayName": "Elevator Music",
+  "description": "Hold music while AI agents work — and a ding when they're done. For VS Code & Cursor.",
+  "version": "0.1.0",
+  "publisher": "joenberg",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joenb33/hold-the-vibe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/joenb33/hold-the-vibe/issues"
+  },
+  "homepage": "https://github.com/joenb33/hold-the-vibe#readme",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "elevatorMusic.statusBarMenu",
+        "title": "Elevator Music: Menu"
+      },
+      {
+        "command": "elevatorMusic.toggleEnabled",
+        "title": "Elevator Music: Toggle Enabled"
+      },
+      {
+        "command": "elevatorMusic.testDing",
+        "title": "Elevator Music: Test Ding"
+      },
+      {
+        "command": "elevatorMusic.testHoldMusic",
+        "title": "Elevator Music: Test Hold Music"
+      },
+      {
+        "command": "elevatorMusic.showDiagnostics",
+        "title": "Elevator Music: Show Diagnostics"
+      },
+      {
+        "command": "elevatorMusic.resetDiagnostics",
+        "title": "Elevator Music: Reset Diagnostics"
+      },
+      {
+        "command": "elevatorMusic.markLastTurnMissed",
+        "title": "Elevator Music: Mark Last Turn Missed"
+      },
+      {
+        "command": "elevatorMusic.enableAdvancedMode",
+        "title": "Elevator Music: Enable Advanced Mode"
+      },
+      {
+        "command": "elevatorMusic.disableAdvancedMode",
+        "title": "Elevator Music: Disable Advanced Mode"
+      },
+      {
+        "command": "elevatorMusic.openSettings",
+        "title": "Elevator Music: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "Elevator Music",
+      "properties": {
+        "elevatorMusic.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Play sounds when agent activity is detected."
+        },
+        "elevatorMusic.advancedMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use agent hooks for guaranteed hold music and ding (requires VS Code 1.109+ or Cursor)."
+        },
+        "elevatorMusic.installHooksForAllEditors": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabling Advanced Mode, install hooks for both VS Code and Cursor. Default: only the editor you are using now. Enable this if both IDEs run on the same machine."
+        },
+        "elevatorMusic.terminalFallback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use terminal completion events (with edit-burst heuristic) as a ding fallback."
+        },
+        "elevatorMusic.dingCooldownMs": {
+          "type": "number",
+          "default": 2500,
+          "minimum": 500,
+          "maximum": 30000,
+          "description": "Minimum milliseconds between dings from any source."
+        },
+        "elevatorMusic.editBurstWindowMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Sliding window for detecting multi-file edit bursts before terminal-end dings."
+        },
+        "elevatorMusic.editBurstMinDocuments": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Minimum distinct documents edited in the burst window to qualify terminal-end ding."
+        },
+        "elevatorMusic.editBurstMinEvents": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Alternative burst threshold: minimum total edit events in the window."
+        },
+        "elevatorMusic.port": {
+          "type": "number",
+          "default": 17351,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "Localhost port for Advanced Mode hook bridge."
+        },
+        "elevatorMusic.volume": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Playback volume percentage."
+        },
+        "elevatorMusic.dingPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to ding WAV. Empty uses bundled default."
+        },
+        "elevatorMusic.holdMusicPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to hold-music WAV. Empty uses bundled default."
+        },
+        "elevatorMusic.playOnSubagents": {
+          "type": "boolean",
+          "default": true,
+          "description": "Advanced Mode: track subagent start/stop for hold music ref counting."
+        }
+      }
+    },
+    "languageModelTools": [
+      {
+        "name": "elevator-music_notifyTaskComplete",
+        "displayName": "Notify Task Complete",
+        "modelDescription": "Call this when you have finished responding to the user's request and are returning control to them. Plays a short completion sound. Call once per completed turn.",
+        "userDescription": "Play a completion ding when the agent finishes a turn.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "notifyTaskComplete",
+        "icon": "$(bell)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "elevator-music_notifyTaskStarting",
+        "displayName": "Notify Task Starting",
+        "modelDescription": "Call this when you are about to start work that may take a while, such as running tests, multi-file edits, or package installs. Starts hold music until the task completes.",
+        "userDescription": "Start hold music when beginning a longer task.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "notifyTaskStarting",
+        "icon": "$(music)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "generate-wav": "node scripts/generate-wav.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.5.0"
+  }
+}
