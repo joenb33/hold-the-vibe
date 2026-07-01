@@ -29,6 +29,9 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      - name: Run tests
+        run: npm test
+
       - name: Verify extension packages
         run: npx --yes @vscode/vsce@latest package --no-dependencies
 

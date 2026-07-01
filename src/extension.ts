@@ -13,7 +13,7 @@ import {
   installHooks,
   resolveHookUninstallTargets,
   setAdvancedModeEnabled,
-  syncCursorHookScripts,
+  refreshInstalledHooks,
   uninstallHooks,
 } from './hookInstaller';
 import { getIdeDisplayName, isCursor } from './ideKind';
@@ -27,6 +27,7 @@ let terminalSignals: TerminalSignals | undefined;
 let hookBridge: HookBridge | undefined;
 let soundPlayer: SoundPlayer | undefined;
 let statusPollTimer: ReturnType<typeof setInterval> | undefined;
+let musicController: MusicController | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
 
 async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<void> {
@@ -40,7 +41,7 @@ async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<
     const result = installHooks(context.extensionPath);
     outputChannel?.appendLine(`Installed hooks: ${formatHookInstallSummary(result)}`);
   } else {
-    syncCursorHookScripts(context.extensionPath);
+    refreshInstalledHooks(context.extensionPath);
   }
 
   if (hookBridge) {
@@ -79,8 +80,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const diagnostics = new Diagnostics();
   soundPlayer = new SoundPlayer(context);
+  soundPlayer.cleanupOrphanedLoop();
   const dingCoordinator = new DingCoordinator(soundPlayer, diagnostics);
-  const musicController = new MusicController(soundPlayer, dingCoordinator, diagnostics);
+  musicController = new MusicController(soundPlayer, dingCoordinator, diagnostics);
 
   const editBurstTracker = new EditBurstTracker(disposables);
   terminalSignals = new TerminalSignals(musicController, editBurstTracker, diagnostics, disposables);
@@ -98,13 +100,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
     const config = getConfig();
-    if (!config.enabled) {
+    if (musicController?.isPlaying()) {
+      statusBarItem.text = '$(debug-stop) Hold music…';
+      statusBarItem.tooltip =
+        'Hold music is playing. Click for menu — choose Stop hold music, or run "Elevator Music: Stop Hold Music" from the Command Palette.';
+    } else if (!config.enabled) {
       statusBarItem.text = '$(mute) Elevator Music';
       statusBarItem.tooltip = 'Elevator Music is disabled. Click to open menu.';
     } else if (config.advancedMode) {
-      if (musicController.isPlaying()) {
-        statusBarItem.text = '$(music) Agent working…';
-      } else if (!hooksInstalledForCurrentIde()) {
+      if (!hooksInstalledForCurrentIde()) {
         statusBarItem.text = '$(warning) Advanced (no hooks)';
       } else if (hookBridge && !hookBridge.owner && !hookBridge.running) {
         statusBarItem.text = '$(warning) Bridge unreachable';
@@ -119,8 +123,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     statusBarItem.show();
   };
 
+  const runHoldWatchdog = (): void => {
+    if (musicController?.checkHoldWatchdog()) {
+      const maxMin = getConfig().maxHoldMinutes;
+      outputChannel?.appendLine(`Auto-stopped hold music after ${maxMin} minutes (maxHoldMinutes).`);
+      void vscode.window.showWarningMessage(
+        `Elevator Music stopped automatically after ${maxMin} minutes.`,
+      );
+      refreshStatusBar();
+    }
+  };
+
   refreshStatusBar();
-  statusPollTimer = setInterval(refreshStatusBar, 2000);
+  statusPollTimer = setInterval(() => {
+    runHoldWatchdog();
+    refreshStatusBar();
+  }, 2000);
   disposables.push({ dispose: () => clearInterval(statusPollTimer) });
 
   if (context.extensionMode === vscode.ExtensionMode.Development) {
@@ -134,8 +152,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!e.affectsConfiguration('elevatorMusic')) {
         return;
       }
-      // Reconcile the bridge if advancedMode was toggled directly in settings.json
-      // (rather than via the Enable/Disable commands), so detection recovers.
       if (e.affectsConfiguration('elevatorMusic.advancedMode') && hookBridge) {
         const advancedNow = getConfig().advancedMode;
         if (advancedNow && !hookBridge.running) {
@@ -143,7 +159,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (!hooksInstalledForCurrentIde()) {
               installHooks(context.extensionPath);
             } else {
-              syncCursorHookScripts(context.extensionPath);
+              refreshInstalledHooks(context.extensionPath);
             }
             await hookBridge.start().catch((err) =>
               console.warn('[Elevator Music] Failed to start bridge on config change:', err),
@@ -153,6 +169,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await hookBridge.disableEverywhere().catch(() => undefined);
         }
       }
+      if (e.affectsConfiguration('elevatorMusic.enabled') && !getConfig().enabled) {
+        musicController?.emergencyStop();
+      }
       refreshStatusBar();
     }),
   );
@@ -160,25 +179,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand('elevatorMusic.statusBarMenu', async () => {
       const config = getConfig();
-      type MenuId = 'toggle' | 'ding' | 'hold' | 'diag' | 'advanced' | 'settings';
-      const pick = await vscode.window.showQuickPick<{ label: string; id: MenuId }>(
-        [
-          { label: config.enabled ? '$(mute) Disable sounds' : '$(unmute) Enable sounds', id: 'toggle' as const },
-          { label: '$(bell) Test ding', id: 'ding' as const },
-          { label: '$(music) Test hold music (3s)', id: 'hold' as const },
-          { label: '$(graph) Show diagnostics', id: 'diag' as const },
-          {
-            label: config.advancedMode ? '$(arrow-left) Disable Advanced Mode' : '$(sparkle) Enable Advanced Mode',
-            id: 'advanced' as const,
-          },
-          { label: '$(settings-gear) Open settings', id: 'settings' as const },
-        ],
-        { placeHolder: 'Elevator Music' },
+      type MenuId = 'stopMusic' | 'toggle' | 'ding' | 'hold' | 'diag' | 'advanced' | 'settings';
+      const items: Array<{ label: string; id: MenuId }> = [];
+      if (musicController?.isPlaying()) {
+        items.push({ label: '$(debug-stop) Stop hold music now', id: 'stopMusic' });
+      }
+      items.push(
+        { label: config.enabled ? '$(mute) Disable sounds' : '$(unmute) Enable sounds', id: 'toggle' },
+        { label: '$(bell) Test ding', id: 'ding' },
+        { label: '$(music) Test hold music (3s)', id: 'hold' },
+        { label: '$(graph) Show diagnostics', id: 'diag' },
+        {
+          label: config.advancedMode ? '$(arrow-left) Disable Advanced Mode' : '$(sparkle) Enable Advanced Mode',
+          id: 'advanced',
+        },
+        { label: '$(settings-gear) Open settings', id: 'settings' },
       );
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Elevator Music' });
       if (!pick) {
         return;
       }
       switch (pick.id) {
+        case 'stopMusic':
+          await vscode.commands.executeCommand('elevatorMusic.stopMusic');
+          break;
         case 'toggle':
           await vscode.commands.executeCommand('elevatorMusic.toggleEnabled');
           break;
@@ -248,6 +272,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void vscode.window.showInformationMessage('Marked last turn as missed in diagnostics.');
     }),
 
+    vscode.commands.registerCommand('elevatorMusic.stopMusic', () => {
+      const stopped = musicController?.emergencyStop() ?? false;
+      outputChannel?.appendLine(stopped ? 'Hold music stopped manually (failsafe).' : 'Stop hold music: nothing was playing.');
+      void vscode.window.showInformationMessage(
+        stopped ? 'Elevator Music: hold music stopped.' : 'Elevator Music: no hold music was playing.',
+      );
+      refreshStatusBar();
+    }),
+
     vscode.commands.registerCommand('elevatorMusic.openSettings', () => {
       void vscode.commands.executeCommand('workbench.action.openSettings', 'elevatorMusic');
     }),
@@ -284,10 +317,6 @@ export async function deactivate(): Promise<void> {
     statusPollTimer = undefined;
   }
   terminalSignals?.dispose();
-  // The hold-loop child process is detached + unref'd specifically so it survives
-  // the extension host restarting mid-loop, but that means nothing else will ever
-  // stop it if we don't do it here — otherwise it's an orphaned process looping
-  // forever every time the window closes or reloads while music is playing.
-  soundPlayer?.stopHoldLoop();
+  musicController?.forceStopAll();
   await hookBridge?.stop();
 }

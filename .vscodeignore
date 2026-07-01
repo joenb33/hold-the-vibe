@@ -3,6 +3,8 @@
 .cursor/**
 src/**
 scripts/**
+test/**
+test-support/**
 .gitignore
 tsconfig.json
 **/*.ts

@@ -139,7 +139,7 @@ function buildCursorHookEntry(action: string): { command: string; timeout: numbe
   return { command: buildCursorHookCommand(action), timeout: 5 };
 }
 
-function isElevatorMusicHook(command: string | undefined): boolean {
+export function isElevatorMusicHook(command: string | undefined): boolean {
   if (typeof command !== 'string') {
     return false;
   }
@@ -201,15 +201,18 @@ export function installVsCodeHooks(extensionPath: string): void {
   ensureExecutable(path.join(extensionPath, 'hooks', 'notify-agent.sh'));
 
   const hookEntry = (action: string) => buildVsCodeHookEntry(extensionPath, action);
+  const playOnSubagents = getConfig().playOnSubagents;
 
-  const config = {
-    hooks: {
-      UserPromptSubmit: [hookEntry('start')],
-      Stop: [hookEntry('stop')],
-      SubagentStart: [hookEntry('start')],
-      SubagentStop: [hookEntry('stop')],
-    },
+  const hooks: Record<string, ReturnType<typeof hookEntry>[]> = {
+    UserPromptSubmit: [hookEntry('start')],
+    Stop: [hookEntry('stop-force')],
   };
+  if (playOnSubagents) {
+    hooks.SubagentStart = [hookEntry('start')];
+    hooks.SubagentStop = [hookEntry('stop')];
+  }
+
+  const config = { hooks };
 
   fs.writeFileSync(getVsCodeHookFilePath(), JSON.stringify(config, null, 2), 'utf8');
 }
@@ -220,12 +223,15 @@ export function installCursorHooks(extensionPath: string): void {
   const config = readCursorHooksFile();
   const cleaned = removeElevatorMusicFromCursorHooks(config);
   const hooks = cleaned.hooks ?? {};
+  const playOnSubagents = getConfig().playOnSubagents;
 
   // Cursor event names (see Cursor hooks docs).
   appendUniqueHook(hooks, 'beforeSubmitPrompt', buildCursorHookEntry('start'));
-  appendUniqueHook(hooks, 'stop', buildCursorHookEntry('stop'));
-  appendUniqueHook(hooks, 'subagentStart', buildCursorHookEntry('start'));
-  appendUniqueHook(hooks, 'subagentStop', buildCursorHookEntry('stop'));
+  appendUniqueHook(hooks, 'stop', buildCursorHookEntry('stop-force'));
+  if (playOnSubagents) {
+    appendUniqueHook(hooks, 'subagentStart', buildCursorHookEntry('start'));
+    appendUniqueHook(hooks, 'subagentStop', buildCursorHookEntry('stop'));
+  }
 
   const out: CursorHooksFile = { version: cleaned.version ?? 1, hooks };
   fs.mkdirSync(path.dirname(getCursorHooksJsonPath()), { recursive: true });
@@ -325,12 +331,20 @@ export function hooksInstalled(): boolean {
   return hooksInstalledForCurrentIde();
 }
 
-/** Refresh Cursor hook scripts when the extension updates. */
-export function syncCursorHookScripts(extensionPath: string): void {
-  if (!cursorHooksInstalled()) {
-    return;
+/** Refresh hook scripts and action mappings when the extension updates. */
+export function refreshInstalledHooks(extensionPath: string): void {
+  const status = getHookInstallStatus();
+  if (status.vsCode) {
+    installVsCodeHooks(extensionPath);
   }
-  copyHookScripts(getCursorHookScriptsDir(), extensionPath);
+  if (status.cursor) {
+    installCursorHooks(extensionPath);
+  }
+}
+
+/** @deprecated Use refreshInstalledHooks */
+export function syncCursorHookScripts(extensionPath: string): void {
+  refreshInstalledHooks(extensionPath);
 }
 
 export async function setAdvancedModeEnabled(enabled: boolean): Promise<void> {

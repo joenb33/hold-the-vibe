@@ -232,8 +232,13 @@ export class HookBridge {
       return;
     }
 
-    if (req.method === 'POST' && url === '/activity/stop') {
-      this.musicController.requestActivityStop('hook');
+    if (req.method === 'POST' && (url === '/activity/stop' || url.startsWith('/activity/stop?'))) {
+      const force = url.includes('force=1');
+      if (force) {
+        this.musicController.requestActivityForceStop('hook');
+      } else {
+        this.musicController.requestActivityStop('hook');
+      }
       this.json(res, { ok: true });
       return;
     }

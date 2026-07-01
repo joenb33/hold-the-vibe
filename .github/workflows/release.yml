@@ -40,13 +40,16 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      - name: Run tests
+        run: npm test
+
       - name: Package VSIX
         run: npx --yes @vscode/vsce@latest package --no-dependencies
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Elevator Music v${{ github.ref_name }}
+          name: Hold the Vibe v${{ github.ref_name }}
           generate_release_notes: true
           files: "*.vsix"
           draft: false

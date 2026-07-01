@@ -5,11 +5,24 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getConfig } from './config';
 
+const LOOP_PID_STATE_KEY = 'elevatorMusic.holdLoopPid';
+
 export class SoundPlayer {
   private loopProcess: ChildProcess | null = null;
   private loopPid: number | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** Kill any hold-loop process left over from a crashed or closed window. */
+  cleanupOrphanedLoop(): void {
+    const stored = this.context.globalState.get<number>(LOOP_PID_STATE_KEY);
+    if (stored === undefined) {
+      return;
+    }
+    console.log(`[Elevator Music] Cleaning orphaned hold loop (pid ${stored})`);
+    this.killProcessTree(stored);
+    void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
+  }
 
   resolveDingPath(): string {
     const custom = getConfig().dingPath.trim();
@@ -36,8 +49,12 @@ export class SoundPlayer {
     this.playOnce(soundFile);
   }
 
+  isLoopRunning(): boolean {
+    return this.loopPid !== undefined;
+  }
+
   startHoldLoop(): void {
-    if (this.loopProcess) {
+    if (this.loopPid !== undefined) {
       return;
     }
     const soundFile = this.resolveHoldMusicPath();
@@ -59,18 +76,22 @@ export class SoundPlayer {
   }
 
   stopHoldLoop(): void {
-    if (!this.loopProcess || this.loopPid === undefined) {
-      this.loopProcess = null;
-      this.loopPid = undefined;
-      return;
-    }
-
-    console.log('[Elevator Music] Stopping hold loop');
-
     const pid = this.loopPid;
+    this.loopProcess?.removeAllListeners();
     this.loopProcess = null;
     this.loopPid = undefined;
 
+    if (pid === undefined) {
+      return;
+    }
+
+    console.log(`[Elevator Music] Stopping hold loop (pid ${pid})`);
+
+    this.killProcessTree(pid);
+    void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
+  }
+
+  private killProcessTree(pid: number): void {
     if (process.platform === 'win32') {
       execFile('taskkill', ['/T', '/F', '/PID', String(pid)], () => undefined);
     } else {
@@ -116,12 +137,8 @@ export class SoundPlayer {
   }
 
   private startWindowsLoop(soundFile: string): void {
-    const ffplay = this.findFfplay();
-    if (ffplay) {
-      this.startFfplayLoop(ffplay, soundFile);
-      return;
-    }
-
+    // Always use MediaPlayer via play-loop.ps1 on Windows. ffplay is detached + unref'd
+    // and can outlive the extension host if stop hooks never fire (e.g. ref-count leak).
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'hooks', 'play-loop.ps1').fsPath;
     const volume = String(getConfig().volume);
     const child = spawn(
@@ -148,17 +165,22 @@ export class SoundPlayer {
       if (this.loopProcess === child) {
         this.loopProcess = null;
         this.loopPid = undefined;
+        void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
       }
     });
     child.on('exit', () => {
       if (this.loopProcess === child) {
         this.loopProcess = null;
         this.loopPid = undefined;
+        void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
       }
     });
     child.unref();
     this.loopProcess = child;
     this.loopPid = child.pid;
+    if (child.pid !== undefined) {
+      void this.context.globalState.update(LOOP_PID_STATE_KEY, child.pid);
+    }
   }
 
   private startUnixLoop(soundFile: string, platform: 'darwin' | 'linux'): void {

@@ -14,6 +14,7 @@ export interface ElevatorMusicConfig {
   dingPath: string;
   holdMusicPath: string;
   playOnSubagents: boolean;
+  maxHoldMinutes: number;
 }
 
 export function getConfig(): ElevatorMusicConfig {
@@ -32,6 +33,7 @@ export function getConfig(): ElevatorMusicConfig {
     dingPath: c.get<string>('dingPath', ''),
     holdMusicPath: c.get<string>('holdMusicPath', ''),
     playOnSubagents: c.get<boolean>('playOnSubagents', true),
+    maxHoldMinutes: c.get<number>('maxHoldMinutes', 0),
   };
 }
 

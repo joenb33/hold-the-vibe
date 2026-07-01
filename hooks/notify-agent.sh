@@ -32,6 +32,7 @@ post() {
 case "$ACTION" in
   start) TARGET="/activity/start" ;;
   stop) TARGET="/activity/stop" ;;
+  stop-force) TARGET="/activity/stop?force=1" ;;
   *) exit 0 ;;
 esac
 

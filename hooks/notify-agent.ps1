@@ -49,6 +49,8 @@ if ($Action -eq 'start') {
   $path = '/activity/start'
 } elseif ($Action -eq 'stop') {
   $path = '/activity/stop'
+} elseif ($Action -eq 'stop-force') {
+  $path = '/activity/stop?force=1'
 } else {
   exit 0
 }
