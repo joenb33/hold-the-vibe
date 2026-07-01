@@ -6,8 +6,8 @@ This project uses GitHub Actions for build, release, and (optional) marketplace 
 
 | Workflow | When | What it does |
 |----------|------|----------------|
-| **CI** | Every push/PR to `main` | `npm ci` → compile → verify VSIX packages |
-| **Release** | Push a tag `v*` (e.g. `v0.1.0`) | Verifies tag = `package.json` version → builds VSIX → GitHub Release |
+| **CI** | Every push/PR to `main` | `npm ci` → compile → test → verify VSIX packages. On **main** push, also tags `v{package.json version}` if that tag is missing (which triggers **Release**). |
+| **Release** | Push a tag `v*` (e.g. `v0.1.3`) | Verifies tag = `package.json` version → builds VSIX → GitHub Release |
 | **Publish to Marketplace** | GitHub Release published, or manual | Publishes VSIX to VS Marketplace + Open VSX (if secrets set) |
 
 ## Ship a new version
@@ -23,14 +23,20 @@ git commit -m "chore: bump version to 0.1.1"
 git push origin main
 ```
 
-### 2. Tag and release
+### 2. Push to main (tag + release are automatic)
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git push origin main
 ```
 
-The **Release** workflow creates a GitHub Release and attaches `elevator-music-0.1.1.vsix`.
+CI on `main` runs tests and, if green, creates tag `v{version}` when that tag does not exist yet. That tag push triggers the **Release** workflow, which creates a GitHub Release and attaches `elevator-music-{version}.vsix`.
+
+To tag manually instead:
+
+```bash
+git tag v0.1.3
+git push origin v0.1.3
+```
 
 ### 3. Marketplace publish (when ready)
 
@@ -49,16 +55,12 @@ The **Release** workflow creates a GitHub Release and attaches `elevator-music-0
 ## Version rules
 
 - Tag **must** match `package.json`: tag `v0.1.0` ↔ `"version": "0.1.0"`.
-- CI does **not** auto-bump versions — you control semver on purpose.
+- CI auto-tags on `main` when the version in `package.json` has no matching `v*` tag yet — you still bump semver intentionally in `package.json`.
 - Pre-release tags (`v0.2.0-beta.1`) mark GitHub releases as pre-release.
 
-## Why not auto-bump every push?
+## Why not auto-bump the version number on every push?
 
-Automatic version bumps on every commit create noisy releases and make semver meaningless. The tag-driven flow keeps:
-
-- `main` always buildable (CI)
-- releases intentional (tags)
-- marketplace in sync with GitHub releases
+Automatic version bumps on every commit create noisy releases and make semver meaningless. You still control the version in `package.json`; CI only creates the matching tag and release once that version lands on `main`.
 
 ## Badges
 
