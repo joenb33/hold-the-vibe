@@ -6,8 +6,8 @@ This project uses GitHub Actions for build, release, and (optional) marketplace 
 
 | Workflow | When | What it does |
 |----------|------|----------------|
-| **CI** | Every push/PR to `main` | `npm ci` → compile → test → verify VSIX packages. On **main** push, also tags `v{package.json version}` if that tag is missing (which triggers **Release**). |
-| **Release** | Push a tag `v*` (e.g. `v0.1.3`) | Verifies tag = `package.json` version → builds VSIX → GitHub Release |
+| **CI** | Every push/PR to `main` | Compile, test, package VSIX. On **main** push, also tags `v{package.json version}` and creates a GitHub Release when that release does not exist yet. |
+| **Release** | Push a tag `v*` manually (e.g. from your machine) | Same checks + GitHub Release — used when you tag locally instead of relying on CI |
 | **Publish to Marketplace** | GitHub Release published, or manual | Publishes VSIX to VS Marketplace + Open VSX (if secrets set) |
 
 ## Ship a new version
@@ -29,7 +29,7 @@ git push origin main
 git push origin main
 ```
 
-CI on `main` runs tests and, if green, creates tag `v{version}` when that tag does not exist yet. That tag push triggers the **Release** workflow, which creates a GitHub Release and attaches `elevator-music-{version}.vsix`.
+CI on `main` runs tests and, if green, creates tag `v{version}` and a GitHub Release when that release does not exist yet (including attaching `elevator-music-{version}.vsix`).
 
 To tag manually instead:
 

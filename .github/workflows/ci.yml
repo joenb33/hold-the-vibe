@@ -43,8 +43,9 @@ jobs:
           path: "*.vsix"
           retention-days: 14
 
-  # After a green build on main, tag package.json's version if that tag does not
-  # exist yet. Pushing the tag triggers the Release workflow (GitHub Release + VSIX).
+  # After a green build on main, tag package.json's version and publish a GitHub
+  # Release when needed. Tags pushed with GITHUB_TOKEN do not trigger other
+  # workflows, so we create the release here (release.yml still handles manual tags).
   tag-release:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -58,15 +59,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create and push tag when version is new
+      - name: Download VSIX
+        uses: actions/download-artifact@v6
+        with:
+          name: elevator-music-vsix
+
+      - name: Tag and publish GitHub Release when version is new
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists — no release tag needed."
+
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+            echo "Created tag ${TAG}"
+          else
+            echo "Tag ${TAG} already exists"
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists — nothing to do."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release ${TAG}"
-          git push origin "$TAG"
+
+          gh release create "$TAG" *.vsix \
+            --title "Hold the Vibe ${TAG}" \
+            --generate-notes
+          echo "Published GitHub Release ${TAG}"
