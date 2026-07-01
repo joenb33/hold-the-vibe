@@ -2,9 +2,9 @@
 
 # 🎵 Hold the Vibe
 
-### *Your AI agent is working. You might as well enjoy the ride.*
+### *You're on hold. The agent is working. Might as well lean into it.*
 
-**Hold the Vibe** plays looping hold music while Copilot, Cursor Agent, or other coding agents work — and a satisfying **ding** when they're done.
+**Hold the Vibe** plays looping elevator music the moment your AI agent starts grinding — because watching tokens scroll is dull, and you're just sitting there anyway. When the agent wraps up, the music stops and you get a little **ding**. That's the cherry on top, not the point.
 
 <br />
 
@@ -26,16 +26,18 @@
 
 ## ✨ Why this exists
 
-Watching an AI agent grind through a multi-step task is boring. The cursor blinks, the terminal scrolls, and you just sit there.
+You kicked off an agent. Now you're watching it think, edit, run commands — and there's nothing for *you* to do but wait. It's boring.
 
-**Hold the Vibe** turns that dead time into a bit: the moment your agent starts working, you get looping elevator hold music — because you're basically on hold, except the call center is a language model. That's the whole point of this extension. The completion ding is just a nice bonus so you know when to look back up.
+**Hold the Vibe** leans into that dead time with a joke: classic elevator hold music while the agent works. You're not really "on hold" with a call center — you're on hold with a language model — but the vibe fits. Sit back, let the muzak play, twiddle your thumbs, glance away from the screen.
 
-| Moment | What you hear |
-|--------|----------------|
-| Agent **starts** working | Smooth elevator hold music — the whole point |
-| Agent **finishes** | A crisp completion ding — the bonus |
+The **ding** when it's done? A small bonus so you know the turn finished. The extension isn't a reminder app for people who forgot they sent a prompt. The music is the whole bit.
 
-No staring at a silent spinner. Just vibes, and a little bell when it's over.
+| Moment | What you hear | Role |
+|--------|----------------|------|
+| Agent **starts** working | Looping elevator hold music | **The main event** |
+| Agent **finishes** | A short completion ding | Nice extra |
+
+Less silent staring. More please-hold energy.
 
 ---
 
@@ -55,11 +57,11 @@ sequenceDiagram
     Agent->>Hook: beforeSubmitPrompt / UserPromptSubmit
     Hook->>Bridge: POST /activity/start
     Bridge->>Vibe: ▶ Start hold music
-    Note over Vibe: 🎵 muzak while you wait...
+    Note over Vibe: 🎵 elevator muzak — the whole joke
     Agent->>Hook: stop / Stop
     Hook->>Bridge: POST /activity/stop
     Bridge->>Vibe: ⏹ Stop music + ding
-    Vibe-->>You: 🔔 Ding! Go check the result
+    Vibe-->>You: 🔔 Music stops, little ding (bonus)
 ```
 
 In plain terms:
@@ -67,8 +69,8 @@ In plain terms:
 1. You send a prompt to your AI agent.
 2. Your editor (VS Code or Cursor) fires a lifecycle "hook" the instant the agent starts working.
 3. A small script forwards that as a message to a tiny local server the extension runs on your own machine — nothing ever leaves your computer.
-4. The extension starts the hold music.
-5. When the agent finishes, the same thing happens in reverse: the music stops and you hear a ding.
+4. The extension starts the hold music — that's the experience you're here for.
+5. When the agent finishes, the music stops and you hear a ding. Helpful, but secondary.
 
 The **Hook**, the **Bridge**, and the music player are all just parts of this one extension — the diagram splits them into separate boxes only to make the order of events clearer.
 
@@ -129,11 +131,11 @@ Open the folder, press **F5**, and use the **Extension Development Host** window
 ## 🚀 Try it right now
 
 1. Look at the **status bar** (bottom-right) → **Advanced (Cursor)** or **Advanced Mode**
-2. Click it → **Test ding** 🔔 then **Test hold music (3s)** 🎵
+2. Click it → **Test hold music (3s)** 🎵 then **Test ding** 🔔
 3. Ask your agent to do something real — refactor a file, run tests, whatever
-4. **Elevator Music: Show Diagnostics** to see hook hit counts (all local, nothing sent anywhere)
+4. Enjoy the hold music while it runs; the ding is just the outro
 
-That's it. If you hear music when the agent starts and a ding when it stops — you're vibing.
+If the muzak starts when the agent starts, it's working.
 
 ---
 
@@ -142,11 +144,11 @@ That's it. If you hear music when the agent starts and a ding when it stops — 
 | | **Advanced Mode** | **Notify Mode** |
 |---|:---:|:---:|
 | Setup | One-time hook install (automatic) | None |
-| Hold music | ✅ Guaranteed | Best effort |
+| **Hold music** | ✅ Guaranteed | Best effort |
 | Completion ding | ✅ Guaranteed | Best effort |
 | Writes hook files | Yes (`~/.cursor` or `~/.copilot`) | No |
 
-Advanced Mode is on by default. Toggle via the status bar menu or `elevatorMusic.advancedMode` in settings.
+Advanced Mode is on by default — reliable hold music on every agent turn. Toggle via the status bar menu or `elevatorMusic.advancedMode` in settings.
 
 ---
 
@@ -234,8 +236,8 @@ Ideas, sounds, platform fixes, docs — all welcome. See [CONTRIBUTING.md](CONTR
 
 <div align="center">
 
-**Hold the Vibe** · Made for everyone who's ever waited on an agent and thought *"please hold…"*
+**Hold the Vibe** · Elevator music while your agent works. The ding is just the outro.
 
-⭐ Star the repo if it made you smile · [github.com/joenb33/hold-the-vibe](https://github.com/joenb33/hold-the-vibe)
+⭐ Star the repo if the joke landed · [github.com/joenb33/hold-the-vibe](https://github.com/joenb33/hold-the-vibe)
 
 </div>
