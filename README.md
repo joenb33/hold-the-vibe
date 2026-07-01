@@ -8,6 +8,7 @@
 
 <br />
 
+[![CI](https://github.com/joenb33/hold-the-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/joenb33/hold-the-vibe/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.96%2B-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
 [![Cursor](https://img.shields.io/badge/Cursor-supported-000000?logo=cursor&logoColor=white)](https://cursor.com/)
@@ -65,23 +66,25 @@ sequenceDiagram
 
 ## ⚡ Install in 60 seconds
 
-### Option A — Build & install (recommended for now)
+### Option A — Download a release (easiest)
+
+Grab the latest `.vsix` from **[GitHub Releases](https://github.com/joenb33/hold-the-vibe/releases)**.
+
+**Extensions** → `⋯` → **Install from VSIX** → select the file. Reload once.
+
+### Option B — Build from source
 
 ```bash
 git clone https://github.com/joenb33/hold-the-vibe.git
 cd hold-the-vibe
 npm install
 npm run compile
-npx @vscode/vsce package
+npm run package
 ```
 
-Then in **VS Code** or **Cursor**:
+Install the generated `.vsix` as above.
 
-**Extensions** → `⋯` → **Install from VSIX** → pick `elevator-music-0.1.0.vsix`
-
-Reload once. You're done.
-
-### Option B — Hack on it
+### Option C — Hack on it
 
 ```bash
 git clone https://github.com/joenb33/hold-the-vibe.git
@@ -188,7 +191,7 @@ More help? [Open an issue](https://github.com/joenb33/hold-the-vibe/issues) — 
 
 ## 🤝 Contributing
 
-Ideas, sounds, platform fixes, docs — all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Ideas, sounds, platform fixes, docs — all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Release process: [RELEASE.md](RELEASE.md).
 
 **Good first PRs:** alternative hold loops (CC0), macOS/Linux playback polish, README improvements.
 

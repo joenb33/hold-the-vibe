@@ -1,0 +1,87 @@
+# Publish to VS Code Marketplace / Open VSX
+#
+# Triggered manually or when a GitHub Release is published.
+# Add secrets in Settings → Secrets and variables → Actions:
+#
+#   VSCE_PAT — Visual Studio Marketplace (Azure DevOps PAT, Marketplace → Manage)
+#   OVSX_PAT — Open VSX (optional; helps Cursor / VSCodium install from registry)
+#
+# Publisher: https://marketplace.visualstudio.com/manage
+
+name: Publish to Marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (must match package.json, e.g. 0.1.0)"
+        required: true
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Verify package.json version
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXPECT="$DISPATCH_VERSION"
+          else
+            EXPECT="${{ github.event.release.tag_name }}"
+            EXPECT="${EXPECT#v}"
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$EXPECT" != "$PKG" ]; then
+            echo "::error::Expected version $EXPECT but package.json has $PKG"
+            exit 1
+          fi
+          echo "Publishing version $PKG"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Package VSIX
+        run: npx --yes @vscode/vsce@latest package --no-dependencies
+
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::warning::VSCE_PAT not set — skipped Visual Studio Marketplace."
+            exit 0
+          fi
+          npx --yes @vscode/vsce@latest publish --no-dependencies --pat "$VSCE_PAT"
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "OVSX_PAT not set — skipped Open VSX (optional)."
+            exit 0
+          fi
+          npx --yes ovsx@latest publish "*.vsix" --pat "$OVSX_PAT"

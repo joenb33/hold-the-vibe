@@ -181,11 +181,13 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "package": "npm run compile && vsce package --no-dependencies",
     "generate-wav": "node scripts/generate-wav.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.2.1",
     "typescript": "^5.5.0"
   }
 }
