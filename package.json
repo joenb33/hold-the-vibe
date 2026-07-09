@@ -2,7 +2,7 @@
   "name": "elevator-music",
   "displayName": "Hold the Vibe",
   "description": "Elevator hold music while your AI agent works — because watching it grind is boring. A ding when it's done is just a bonus. VS Code & Cursor.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "joenberg",
   "license": "MIT",
   "repository": {
