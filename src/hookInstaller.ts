@@ -41,6 +41,8 @@ export interface HookInstallResult {
   /** Which editor hook paths were written this call. */
   installedTargets: HookTarget[];
   status: HookInstallStatus;
+  /** True when ~/.copilot/hooks was newly added to chat.hookFilesLocations. */
+  vsCodeDiscoveryRegistered: boolean;
 }
 
 /** Editors whose hook files installHooks will touch for this session. */
@@ -236,8 +238,8 @@ function appendUniqueHook(
   hooks[event] = list;
 }
 
-export async function installVsCodeHooks(extensionPath: string): Promise<void> {
-  await ensureVsCodeHookDiscovery();
+export async function installVsCodeHooks(extensionPath: string): Promise<boolean> {
+  const discoveryRegistered = await ensureVsCodeHookDiscovery();
 
   const hooksDir = path.dirname(getVsCodeHookFilePath());
   fs.mkdirSync(hooksDir, { recursive: true });
@@ -249,6 +251,7 @@ export async function installVsCodeHooks(extensionPath: string): Promise<void> {
   const config = buildVsCodeHooksFile(extensionPath);
 
   fs.writeFileSync(getVsCodeHookFilePath(), JSON.stringify(config, null, 2), 'utf8');
+  return discoveryRegistered;
 }
 
 export function installCursorHooks(extensionPath: string): void {
@@ -275,13 +278,14 @@ export function installCursorHooks(extensionPath: string): void {
 /** Install hooks for the current editor, or both if installHooksForAllEditors is set. */
 export async function installHooks(extensionPath: string): Promise<HookInstallResult> {
   const targets = resolveHookInstallTargets();
+  let vsCodeDiscoveryRegistered = false;
   if (targets.includes('vscode')) {
-    await installVsCodeHooks(extensionPath);
+    vsCodeDiscoveryRegistered = await installVsCodeHooks(extensionPath);
   }
   if (targets.includes('cursor')) {
     installCursorHooks(extensionPath);
   }
-  return { installedTargets: targets, status: getHookInstallStatus() };
+  return { installedTargets: targets, status: getHookInstallStatus(), vsCodeDiscoveryRegistered };
 }
 
 export function uninstallHooksForTargets(targets: HookTarget[]): void {
@@ -366,14 +370,16 @@ export function hooksInstalled(): boolean {
 }
 
 /** Refresh hook scripts and action mappings when the extension updates. */
-export async function refreshInstalledHooks(extensionPath: string): Promise<void> {
+export async function refreshInstalledHooks(extensionPath: string): Promise<boolean> {
   const status = getHookInstallStatus();
+  let vsCodeDiscoveryRegistered = false;
   if (status.vsCode) {
-    await installVsCodeHooks(extensionPath);
+    vsCodeDiscoveryRegistered = await installVsCodeHooks(extensionPath);
   }
   if (status.cursor) {
     installCursorHooks(extensionPath);
   }
+  return vsCodeDiscoveryRegistered;
 }
 
 /** @deprecated Use refreshInstalledHooks */

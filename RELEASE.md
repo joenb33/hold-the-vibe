@@ -14,8 +14,8 @@ This project uses GitHub Actions for build, release, and (optional) marketplace 
 
 Push to `main`. CI handles the rest:
 
-1. If `package.json`'s version **already has** a `v*` tag (the last release), CI auto-bumps the **patch** version (`0.1.3` → `0.1.4`) and pushes that commit.
-2. The next CI run (triggered by the bump commit) builds, tests, packages the VSIX, tags `v{version}`, and creates a GitHub Release when one does not exist yet.
+1. If `package.json`'s version **already has** a `v*` tag, CI bumps the **patch** in the same run (`0.1.4` → `0.1.5`), builds that version, commits the bump, then tags and releases.
+2. If the version is **not** tagged yet, CI builds as-is, tags `v{version}`, and creates a GitHub Release (with the VSIX attached).
 
 You only need to bump **minor** or **major** yourself when you want a bigger semver step.
 
@@ -54,7 +54,7 @@ git push origin v0.1.3
 ## Version rules
 
 - Tag **must** match `package.json`: tag `v0.1.0` ↔ `"version": "0.1.0"`.
-- CI auto-bumps the **patch** on `main` when that version is already tagged, then the follow-up run tags and releases.
+- CI auto-bumps the **patch** on `main` when that version is already tagged, then builds and releases in the **same workflow run**.
 - Bump **minor** or **major** manually in `package.json` when you want a deliberate semver jump.
 - Pre-release tags (`v0.2.0-beta.1`) mark GitHub releases as pre-release.
 

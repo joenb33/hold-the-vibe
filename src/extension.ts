@@ -54,6 +54,30 @@ async function reconcileUnsupportedAdvancedMode(context: vscode.ExtensionContext
   }
 }
 
+async function promptReloadIfNeeded(
+  context: vscode.ExtensionContext,
+  reason: 'first-install' | 'hook-discovery',
+): Promise<void> {
+  const reloadPromptKey = 'elevatorMusic.advancedModeReloadPrompted';
+  if (context.globalState.get<boolean>(reloadPromptKey)) {
+    return;
+  }
+  await context.globalState.update(reloadPromptKey, true);
+
+  const detail =
+    reason === 'hook-discovery'
+      ? 'VS Code needs a reload to load ~/.copilot/hooks.'
+      : `${getIdeDisplayName()} needs a reload to pick up the new hooks.`;
+  const choice = await vscode.window.showInformationMessage(
+    `Elevator Music: Advanced Mode hooks updated. Reload this window once. ${detail}`,
+    'Reload now',
+    'Later',
+  );
+  if (choice === 'Reload now') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
+}
+
 async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<void> {
   await reconcileUnsupportedAdvancedMode(context);
 
@@ -63,11 +87,13 @@ async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<
   }
 
   const alreadyInstalled = hooksInstalledForCurrentIde();
+  let vsCodeDiscoveryRegistered = false;
   if (!alreadyInstalled) {
     const result = await installHooks(context.extensionPath);
     outputChannel?.appendLine(`Installed hooks: ${formatHookInstallSummary(result)}`);
+    vsCodeDiscoveryRegistered = result.vsCodeDiscoveryRegistered;
   } else {
-    await refreshInstalledHooks(context.extensionPath);
+    vsCodeDiscoveryRegistered = await refreshInstalledHooks(context.extensionPath);
   }
 
   if (hookBridge) {
@@ -77,20 +103,13 @@ async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<
     });
   }
 
-  const reloadPromptKey = 'elevatorMusic.advancedModeReloadPrompted';
-  const needsReloadPrompt =
-    !alreadyInstalled && hooksInstalledForCurrentIde() && !context.globalState.get<boolean>(reloadPromptKey);
-
-  if (needsReloadPrompt) {
-    await context.globalState.update(reloadPromptKey, true);
-    const choice = await vscode.window.showInformationMessage(
-      `Elevator Music: Advanced Mode hooks installed. Reload this window once so ${getIdeDisplayName()} picks them up.`,
-      'Reload now',
-      'Later',
-    );
-    if (choice === 'Reload now') {
-      await vscode.commands.executeCommand('workbench.action.reloadWindow');
-    }
+  if (!hooksInstalledForCurrentIde()) {
+    return;
+  }
+  if (!alreadyInstalled) {
+    await promptReloadIfNeeded(context, 'first-install');
+  } else if (vsCodeDiscoveryRegistered) {
+    await promptReloadIfNeeded(context, 'hook-discovery');
   }
 }
 
@@ -136,7 +155,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } else if (config.advancedMode) {
       if (!hooksInstalledForCurrentIde()) {
         statusBarItem.text = '$(warning) Advanced (no hooks)';
-      } else if (hookBridge && !hookBridge.owner && !hookBridge.running) {
+      } else if (hookBridge && !hookBridge.connected) {
         statusBarItem.text = '$(warning) Bridge unreachable';
       } else {
         statusBarItem.text = isCursor() ? '$(music) Advanced (Cursor)' : '$(music) Advanced Mode';
@@ -163,6 +182,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   refreshStatusBar();
   statusPollTimer = setInterval(() => {
     runHoldWatchdog();
+    const config = getConfig();
+    if (config.advancedMode && config.enabled && hookBridge && hooksInstalledForCurrentIde()) {
+      void hookBridge.ensureAvailable().catch(() => undefined);
+    }
     refreshStatusBar();
   }, 2000);
   disposables.push({ dispose: () => clearInterval(statusPollTimer) });
@@ -178,10 +201,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!e.affectsConfiguration('elevatorMusic')) {
         return;
       }
-      if (e.affectsConfiguration('elevatorMusic.advancedMode') && hookBridge) {
-        const advancedNow = getConfig().advancedMode;
-        if (advancedNow && !hookBridge.running) {
-          if (isAdvancedModeSupported()) {
+
+      if (e.affectsConfiguration('elevatorMusic.advancedMode')) {
+        await reconcileUnsupportedAdvancedMode(context);
+        if (hookBridge) {
+          const advancedNow = getConfig().advancedMode;
+          if (advancedNow && isAdvancedModeSupported()) {
             if (!hooksInstalledForCurrentIde()) {
               await installHooks(context.extensionPath);
             } else {
@@ -190,11 +215,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             await hookBridge.start().catch((err) =>
               console.warn('[Elevator Music] Failed to start bridge on config change:', err),
             );
+          } else if (!advancedNow) {
+            await hookBridge.disableEverywhere().catch(() => undefined);
           }
-        } else if (!advancedNow) {
-          await hookBridge.disableEverywhere().catch(() => undefined);
         }
+      } else if (
+        getConfig().advancedMode &&
+        isAdvancedModeSupported() &&
+        (e.affectsConfiguration('elevatorMusic.playOnSubagents') ||
+          e.affectsConfiguration('elevatorMusic.installHooksForAllEditors'))
+      ) {
+        await refreshInstalledHooks(context.extensionPath);
       }
+
       if (e.affectsConfiguration('elevatorMusic.enabled') && !getConfig().enabled) {
         musicController?.emergencyStop();
       }
@@ -284,7 +317,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vsCodeHooksInstalled: status.vsCode,
         cursorHooksInstalled: status.cursor,
         bridgeOwner: hookBridge?.owner ?? false,
-        bridgeRunning: hookBridge?.running ?? false,
+        bridgeRunning: hookBridge?.connected ?? false,
       });
     }),
 

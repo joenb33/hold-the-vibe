@@ -10,15 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  # If package.json's version is already tagged (e.g. after a prior release),
-  # bump the patch version and push — the follow-up CI run builds and releases.
-  bump-version:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      bumped: ${{ steps.bump.outputs.bumped }}
 
     steps:
       - name: Checkout
@@ -33,44 +28,17 @@ jobs:
           cache: npm
 
       - name: Bump patch when current version is already released
-        id: bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
 
-          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            npm version patch --no-git-tag-version
+            echo "Tag ${TAG} already exists — bumped to $(node -p "require('./package.json').version")."
+          else
             echo "Version ${VERSION} is not tagged yet — no bump needed."
-            echo "bumped=false" >> "$GITHUB_OUTPUT"
-            exit 0
           fi
-
-          npm version patch --no-git-tag-version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "Tag ${TAG} already exists — bumped to ${NEW_VERSION}."
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to ${NEW_VERSION}"
-          git push origin main
-          echo "bumped=true" >> "$GITHUB_OUTPUT"
-
-  build:
-    needs: bump-version
-    if: |
-      always() &&
-      (needs.bump-version.result == 'skipped' || needs.bump-version.outputs.bumped != 'true')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -84,6 +52,23 @@ jobs:
       - name: Verify extension packages
         run: npx --yes @vscode/vsce@latest package --no-dependencies
 
+      - name: Commit version bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet package.json package-lock.json; then
+            echo "No version bump to commit."
+            exit 0
+          fi
+
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+          git push origin main
+
       - name: Upload VSIX artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v6
@@ -92,17 +77,11 @@ jobs:
           path: "*.vsix"
           retention-days: 14
 
-  # After a green build on main, tag package.json's version and publish a GitHub
-  # Release when needed. Tags pushed with GITHUB_TOKEN do not trigger other
-  # workflows, so we create the release here (release.yml still handles manual tags).
+  # Tags pushed with GITHUB_TOKEN do not trigger other workflows, so we create
+  # the release here (release.yml still handles manual tags).
   tag-release:
-    needs: [bump-version, build]
-    if: |
-      always() &&
-      needs.build.result == 'success' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      (needs.bump-version.result == 'skipped' || needs.bump-version.outputs.bumped != 'true')
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,6 +92,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Sync main after version bump
+        run: git pull origin main
+
       - name: Download VSIX
         uses: actions/download-artifact@v6
         with:
@@ -122,7 +104,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VSIX=$(ls elevator-music-*.vsix | head -n 1)
+          VERSION="${VSIX#elevator-music-}"
+          VERSION="${VERSION%.vsix}"
           TAG="v${VERSION}"
 
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -140,7 +124,7 @@ jobs:
             exit 0
           fi
 
-          gh release create "$TAG" *.vsix \
+          gh release create "$TAG" "$VSIX" \
             --title "Hold the Vibe ${TAG}" \
             --generate-notes
           echo "Published GitHub Release ${TAG}"

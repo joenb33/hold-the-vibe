@@ -6,8 +6,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 function Get-BridgePort {
   $paths = @(
-    (Join-Path $HOME '.elevator-music' 'bridge.json'),
-    (Join-Path $HOME '.copilot' 'elevator-music-bridge.json')
+    (Join-Path -Path $HOME -ChildPath '.elevator-music\bridge.json'),
+    (Join-Path -Path $HOME -ChildPath '.copilot\elevator-music-bridge.json')
   )
   $port = 17351
   foreach ($bridgeFile in $paths) {

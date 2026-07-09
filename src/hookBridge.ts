@@ -22,6 +22,7 @@ export interface BridgeDiscoveryFile {
 export class HookBridge {
   private server: http.Server | null = null;
   private isOwner = false;
+  private remoteBridge = false;
   private boundPort = 0;
 
   constructor(
@@ -37,17 +38,46 @@ export class HookBridge {
     return this.isOwner;
   }
 
+  /** True when this window owns the bridge or a remote bridge answered /health. */
+  get connected(): boolean {
+    return this.server !== null || this.remoteBridge;
+  }
+
+  /**
+   * Re-check bridge health and become owner if the previous window closed.
+   * Safe to call periodically from Advanced Mode windows.
+   */
+  async ensureAvailable(): Promise<void> {
+    if (this.server) {
+      return;
+    }
+
+    const config = getConfig();
+    if (await this.healthCheck(config.port)) {
+      this.remoteBridge = true;
+      return;
+    }
+
+    if (await this.tryConnectExisting(config.port)) {
+      this.remoteBridge = true;
+      return;
+    }
+
+    this.remoteBridge = false;
+    await this.bindServer(config.port);
+  }
   async start(): Promise<void> {
     if (this.server) {
       return;
     }
 
     const config = getConfig();
-    const existing = await this.tryConnectExisting(config.port);
-    if (existing) {
+    if (await this.tryConnectExisting(config.port)) {
+      this.remoteBridge = true;
       return;
     }
 
+    this.remoteBridge = false;
     await this.bindServer(config.port);
   }
 
@@ -87,6 +117,7 @@ export class HookBridge {
     });
     this.server = null;
     this.isOwner = false;
+    this.remoteBridge = false;
     this.boundPort = 0;
     this.removeDiscoveryFile();
   }
