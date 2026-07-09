@@ -1,0 +1,73 @@
+name: Bug report
+description: Something isn't working in VS Code or Cursor
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If you don't have permission to open issues here, use [Discussions](https://github.com/joenb33/hold-the-vibe/discussions) or the [Marketplace Q&A](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music&ssr=false#qna) instead.
+  - type: dropdown
+    id: editor
+    attributes:
+      label: Editor
+      options:
+        - VS Code
+        - Cursor
+        - Other VS Code fork
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Editor version
+      description: Help → About, or run `code --version` / `cursor --version`
+      placeholder: e.g. VS Code 1.111.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Advanced Mode (hooks)
+        - Notify Mode
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: 1. Enable Advanced Mode … 2. Start an agent task …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (optional)
+      description: Command Palette → **Elevator Music: Show Diagnostics** — paste the Environment section
+      render: shell

@@ -28,6 +28,18 @@ Use **Elevator Music: Show Diagnostics** to verify hook hit rates during testing
 3. Run `npm run compile` before opening the PR.
 4. Describe what you tested (editor, OS, Advanced vs Notify Mode).
 
+## Feedback and bug reports
+
+You can reach us in several ways:
+
+| Channel | Best for |
+|---------|----------|
+| [GitHub Issues](https://github.com/joenb33/hold-the-vibe/issues) | Confirmed bugs with repro steps |
+| [GitHub Discussions](https://github.com/joenb33/hold-the-vibe/discussions) | Questions, ideas, or if issue creation is unavailable |
+| [Marketplace Q&A](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music&ssr=false#qna) | Install and playback problems |
+
+**Repo maintainers:** to let anyone open issues, check **Settings → General → Issues** and ensure issue creation is not limited to collaborators only.
+
 ## Code style
 
 - Match existing TypeScript patterns in `src/`.

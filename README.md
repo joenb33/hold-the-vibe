@@ -18,7 +18,7 @@
 
 <br />
 
-[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music) · [How it works](#-how-it-works) · [Contributing](CONTRIBUTING.md) · [Report a bug](https://github.com/joenb33/hold-the-vibe/issues)
+[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music) · [How it works](#-how-it-works) · [Contributing](CONTRIBUTING.md) · [Report a bug](https://github.com/joenb33/hold-the-vibe/issues) · [Discussions](https://github.com/joenb33/hold-the-vibe/discussions)
 
 </div>
 
@@ -192,6 +192,16 @@ Full credits: [media/ATTRIBUTION.md](media/ATTRIBUTION.md). Swap in your own WAV
 ## 🛟 Troubleshooting
 
 <details>
+<summary><strong>Works in Cursor but not VS Code</strong></summary>
+
+Advanced Mode needs **VS Code 1.109+** with **GitHub Copilot Chat** agent hooks. The extension registers `~/.copilot/hooks` in your user `chat.hookFilesLocations` setting automatically — reload once after first install.
+
+Check the status bar: **Advanced Mode** (not **Advanced (no hooks)** or **Bridge unreachable**). Run **Elevator Music: Show Diagnostics** and confirm `VS Code hooks: installed` and `Bridge: owner` or `running`.
+
+Still stuck? Try **Test hold music (3s)** from the status bar menu — if that works but agent turns don't, hooks aren't firing (upgrade VS Code or re-enable Advanced Mode).
+</details>
+
+<details>
 <summary><strong>Ding works but no hold music</strong></summary>
 
 Large WAV files can take a moment to start on Windows. Check **Output → Log (Extension Host)** for `[Elevator Music] Starting hold loop`. Try **Test hold music (3s)** from the status bar menu.
@@ -215,7 +225,7 @@ Unrelated VS Code bug — see [microsoft/vscode#301795](https://github.com/micro
 One window owns the localhost bridge; others connect passively. Disabling Advanced Mode sends a clean shutdown to all windows.
 </details>
 
-More help? [Open an issue](https://github.com/joenb33/hold-the-vibe/issues) — we actually read them.
+More help? [Open an issue](https://github.com/joenb33/hold-the-vibe/issues), [start a Discussion](https://github.com/joenb33/hold-the-vibe/discussions), or use [Marketplace Q&A](https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music&ssr=false#qna) — we actually read them.
 
 ---
 

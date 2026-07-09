@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GitHub Discussions (Q&A)
+    url: https://github.com/joenb33/hold-the-vibe/discussions
+    about: Ask questions or share feedback without opening a formal issue.
+  - name: VS Marketplace Q&A
+    url: https://marketplace.visualstudio.com/items?itemName=joenberg.elevator-music&ssr=false#qna
+    about: Report install or playback problems from the extension listing.
+  - name: Security issue
+    url: https://github.com/joenb33/hold-the-vibe/security/advisories/new
+    about: Report a security vulnerability privately.

@@ -17,6 +17,7 @@ import {
   uninstallHooks,
 } from './hookInstaller';
 import { getIdeDisplayName, isCursor } from './ideKind';
+import { MIN_VSCODE_VERSION_ADVANCED } from './types';
 import { MusicController } from './musicController';
 import { registerNotifyTools } from './notifyTools';
 import { SoundPlayer } from './soundPlayer';
@@ -30,7 +31,32 @@ let statusPollTimer: ReturnType<typeof setInterval> | undefined;
 let musicController: MusicController | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
 
+async function reconcileUnsupportedAdvancedMode(context: vscode.ExtensionContext): Promise<void> {
+  const config = getConfig();
+  if (!config.advancedMode || isAdvancedModeSupported()) {
+    return;
+  }
+
+  await setAdvancedModeEnabled(false);
+  const warnedKey = 'elevatorMusic.unsupportedAdvancedModeNotified';
+  if (context.globalState.get<boolean>(warnedKey)) {
+    return;
+  }
+  await context.globalState.update(warnedKey, true);
+
+  const choice = await vscode.window.showWarningMessage(
+    `Elevator Music: Advanced Mode needs VS Code ${MIN_VSCODE_VERSION_ADVANCED}+ (you have ${vscode.version}). Switched to Notify Mode until you upgrade.`,
+    'Open settings',
+    'OK',
+  );
+  if (choice === 'Open settings') {
+    await vscode.commands.executeCommand('workbench.action.openSettings', 'elevatorMusic.advancedMode');
+  }
+}
+
 async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<void> {
+  await reconcileUnsupportedAdvancedMode(context);
+
   const config = getConfig();
   if (!config.advancedMode || !isAdvancedModeSupported()) {
     return;
@@ -38,10 +64,10 @@ async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<
 
   const alreadyInstalled = hooksInstalledForCurrentIde();
   if (!alreadyInstalled) {
-    const result = installHooks(context.extensionPath);
+    const result = await installHooks(context.extensionPath);
     outputChannel?.appendLine(`Installed hooks: ${formatHookInstallSummary(result)}`);
   } else {
-    refreshInstalledHooks(context.extensionPath);
+    await refreshInstalledHooks(context.extensionPath);
   }
 
   if (hookBridge) {
@@ -58,7 +84,7 @@ async function reconcileAdvancedMode(context: vscode.ExtensionContext): Promise<
   if (needsReloadPrompt) {
     await context.globalState.update(reloadPromptKey, true);
     const choice = await vscode.window.showInformationMessage(
-      'Elevator Music: Advanced Mode hooks installed. Reload this window once so Cursor picks them up.',
+      `Elevator Music: Advanced Mode hooks installed. Reload this window once so ${getIdeDisplayName()} picks them up.`,
       'Reload now',
       'Later',
     );
@@ -157,9 +183,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (advancedNow && !hookBridge.running) {
           if (isAdvancedModeSupported()) {
             if (!hooksInstalledForCurrentIde()) {
-              installHooks(context.extensionPath);
+              await installHooks(context.extensionPath);
             } else {
-              refreshInstalledHooks(context.extensionPath);
+              await refreshInstalledHooks(context.extensionPath);
             }
             await hookBridge.start().catch((err) =>
               console.warn('[Elevator Music] Failed to start bridge on config change:', err),
@@ -289,7 +315,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!(await ensureAdvancedModeSupported())) {
         return;
       }
-      const status = installHooks(context.extensionPath);
+      const status = await installHooks(context.extensionPath);
       await setAdvancedModeEnabled(true);
       await hookBridge?.start();
       void vscode.window.showInformationMessage(

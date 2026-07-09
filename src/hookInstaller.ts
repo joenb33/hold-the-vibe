@@ -6,6 +6,8 @@ import { getConfig } from './config';
 import { isCursor, isVsCode } from './ideKind';
 
 const VS_CODE_HOOK_FILE = 'elevator-music.json';
+/** VS Code only loads user hook JSON from paths registered in chat.hookFilesLocations. */
+const VS_CODE_HOOK_DIR_SETTING = '~/.copilot/hooks';
 const CURSOR_HOOKS_DIR = 'elevator-music';
 const HOOK_COMMAND_MARKER = 'elevator-music/notify-agent';
 const BRIDGE_DIR = '.elevator-music';
@@ -125,6 +127,48 @@ function buildVsCodeHookEntry(extensionPath: string, action: string): VsCodeHook
   };
 }
 
+export interface VsCodeHooksFile {
+  version: number;
+  hooks: Record<string, ReturnType<typeof buildVsCodeHookEntry>[]>;
+}
+
+/** Build the VS Code / Copilot hook JSON written to ~/.copilot/hooks/. */
+export function buildVsCodeHooksFile(extensionPath: string): VsCodeHooksFile {
+  const hookEntry = (action: string) => buildVsCodeHookEntry(extensionPath, action);
+  const playOnSubagents = getConfig().playOnSubagents;
+
+  const hooks: VsCodeHooksFile['hooks'] = {
+    UserPromptSubmit: [hookEntry('start')],
+    Stop: [hookEntry('stop-force')],
+  };
+  if (playOnSubagents) {
+    hooks.SubagentStart = [hookEntry('start')];
+    hooks.SubagentStop = [hookEntry('stop')];
+  }
+
+  return { version: 1, hooks };
+}
+
+/**
+ * VS Code does not load ~/.copilot/hooks unless that folder is enabled in
+ * chat.hookFilesLocations (see microsoft/vscode#296793). Register it when we
+ * install user-level hooks so agent events actually reach the bridge.
+ */
+export async function ensureVsCodeHookDiscovery(): Promise<boolean> {
+  const chatConfig = vscode.workspace.getConfiguration('chat');
+  const locations = chatConfig.get<Record<string, boolean>>('hookFilesLocations') ?? {};
+  if (locations[VS_CODE_HOOK_DIR_SETTING]) {
+    return false;
+  }
+
+  await chatConfig.update(
+    'hookFilesLocations',
+    { ...locations, [VS_CODE_HOOK_DIR_SETTING]: true },
+    vscode.ConfigurationTarget.Global,
+  );
+  return true;
+}
+
 function buildCursorHookCommand(action: string): string {
   const scriptDir = getCursorHookScriptsDir();
   if (process.platform === 'win32') {
@@ -192,7 +236,9 @@ function appendUniqueHook(
   hooks[event] = list;
 }
 
-export function installVsCodeHooks(extensionPath: string): void {
+export async function installVsCodeHooks(extensionPath: string): Promise<void> {
+  await ensureVsCodeHookDiscovery();
+
   const hooksDir = path.dirname(getVsCodeHookFilePath());
   fs.mkdirSync(hooksDir, { recursive: true });
 
@@ -200,19 +246,7 @@ export function installVsCodeHooks(extensionPath: string): void {
   // copy), so make sure that copy is executable too.
   ensureExecutable(path.join(extensionPath, 'hooks', 'notify-agent.sh'));
 
-  const hookEntry = (action: string) => buildVsCodeHookEntry(extensionPath, action);
-  const playOnSubagents = getConfig().playOnSubagents;
-
-  const hooks: Record<string, ReturnType<typeof hookEntry>[]> = {
-    UserPromptSubmit: [hookEntry('start')],
-    Stop: [hookEntry('stop-force')],
-  };
-  if (playOnSubagents) {
-    hooks.SubagentStart = [hookEntry('start')];
-    hooks.SubagentStop = [hookEntry('stop')];
-  }
-
-  const config = { hooks };
+  const config = buildVsCodeHooksFile(extensionPath);
 
   fs.writeFileSync(getVsCodeHookFilePath(), JSON.stringify(config, null, 2), 'utf8');
 }
@@ -239,10 +273,10 @@ export function installCursorHooks(extensionPath: string): void {
 }
 
 /** Install hooks for the current editor, or both if installHooksForAllEditors is set. */
-export function installHooks(extensionPath: string): HookInstallResult {
+export async function installHooks(extensionPath: string): Promise<HookInstallResult> {
   const targets = resolveHookInstallTargets();
   if (targets.includes('vscode')) {
-    installVsCodeHooks(extensionPath);
+    await installVsCodeHooks(extensionPath);
   }
   if (targets.includes('cursor')) {
     installCursorHooks(extensionPath);
@@ -332,10 +366,10 @@ export function hooksInstalled(): boolean {
 }
 
 /** Refresh hook scripts and action mappings when the extension updates. */
-export function refreshInstalledHooks(extensionPath: string): void {
+export async function refreshInstalledHooks(extensionPath: string): Promise<void> {
   const status = getHookInstallStatus();
   if (status.vsCode) {
-    installVsCodeHooks(extensionPath);
+    await installVsCodeHooks(extensionPath);
   }
   if (status.cursor) {
     installCursorHooks(extensionPath);

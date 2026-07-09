@@ -7,6 +7,8 @@ const {
   resolveHookInstallTargets,
   resolveHookUninstallTargets,
   isElevatorMusicHook,
+  buildVsCodeHooksFile,
+  ensureVsCodeHookDiscovery,
 } = require('../out/hookInstaller.js');
 
 beforeEach(() => {
@@ -59,4 +61,28 @@ test('detects our own hook command on Windows-style backslash paths', () => {
 test('does not match unrelated hook commands', () => {
   assert.equal(isElevatorMusicHook('./scripts/some-other-hook.sh'), false);
   assert.equal(isElevatorMusicHook(undefined), false);
+});
+
+test('VS Code hook file includes version 1 and UserPromptSubmit events', () => {
+  vscodeStub.__setConfig({ playOnSubagents: true });
+  const config = buildVsCodeHooksFile('/ext/path');
+  assert.equal(config.version, 1);
+  assert.ok(Array.isArray(config.hooks.UserPromptSubmit));
+  assert.ok(Array.isArray(config.hooks.Stop));
+  assert.ok(Array.isArray(config.hooks.SubagentStart));
+  assert.ok(config.hooks.UserPromptSubmit[0].type, 'command');
+});
+
+test('ensureVsCodeHookDiscovery registers ~/.copilot/hooks in chat.hookFilesLocations', async () => {
+  vscodeStub.__setConfig({}, 'chat');
+  const added = await ensureVsCodeHookDiscovery();
+  assert.equal(added, true);
+  const chat = vscodeStub.__getSectionConfig('chat');
+  assert.equal(chat.hookFilesLocations['~/.copilot/hooks'], true);
+});
+
+test('ensureVsCodeHookDiscovery is a no-op when ~/.copilot/hooks is already enabled', async () => {
+  vscodeStub.__setConfig({ hookFilesLocations: { '~/.copilot/hooks': true } }, 'chat');
+  const added = await ensureVsCodeHookDiscovery();
+  assert.equal(added, false);
 });
