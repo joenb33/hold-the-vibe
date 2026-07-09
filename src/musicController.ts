@@ -158,6 +158,18 @@ export class MusicController {
     this.emergencyStop();
   }
 
+  /** Restart hold audio when hooks still expect music but the loop process exited. */
+  recoverHoldLoopIfNeeded(): void {
+    const config = getConfig();
+    if (!config.enabled || !config.advancedMode || this.hookRefCount <= 0) {
+      return;
+    }
+    if (this.soundPlayer.isLoopRunning()) {
+      return;
+    }
+    this.soundPlayer.startHoldLoop();
+  }
+
   private markHoldLoopStarted(): void {
     this.holdLoopStartedAt = Date.now();
   }

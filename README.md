@@ -199,6 +199,8 @@ Advanced Mode needs **VS Code 1.109+** with **GitHub Copilot Chat** agent hooks.
 Check the status bar: **Advanced Mode** (not **Advanced (no hooks)** or **Bridge unreachable**). Run **Elevator Music: Show Diagnostics** and confirm `VS Code hooks: installed` and `Bridge: owner` or `running`.
 
 Still stuck? Try **Test hold music (3s)** from the status bar menu — if that works but agent turns don't, hooks aren't firing (upgrade VS Code or re-enable Advanced Mode).
+
+If diagnostics show hook activity but you hear nothing on **Windows**, check **Output → Elevator Music** for playback errors. Earlier versions spawned audio in a detached process that exited immediately on Windows.
 </details>
 
 <details>

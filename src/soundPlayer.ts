@@ -7,11 +7,18 @@ import { getConfig } from './config';
 
 const LOOP_PID_STATE_KEY = 'elevatorMusic.holdLoopPid';
 
+type PlaybackLog = (message: string) => void;
+
 export class SoundPlayer {
   private loopProcess: ChildProcess | null = null;
   private loopPid: number | undefined;
+  private log: PlaybackLog = (message) => console.warn(`[Elevator Music] ${message}`);
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  setPlaybackLogger(logger: PlaybackLog): void {
+    this.log = logger;
+  }
 
   /** Kill any hold-loop process left over from a crashed or closed window. */
   cleanupOrphanedLoop(): void {
@@ -109,15 +116,22 @@ export class SoundPlayer {
 
   private playOnce(soundFile: string): void {
     if (process.platform === 'win32') {
-      const escaped = soundFile.replace(/'/g, "''");
-      // PlaySync blocks until the clip finishes; Play() returns immediately and the
-      // short-lived PowerShell process often exits before audio is heard.
-      const ps = `$p = New-Object System.Media.SoundPlayer '${escaped}'; $p.PlaySync()`;
-      execFile('powershell', ['-NoProfile', '-Command', ps], (err) => {
-        if (err) {
-          console.warn('[Elevator Music] Ding playback failed:', err.message);
-        }
-      });
+      const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'hooks', 'play-ding.ps1').fsPath;
+      const volume = String(getConfig().volume);
+      execFile(
+        'powershell',
+        ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, soundFile, volume],
+        (err, _stdout, stderr) => {
+          if (err) {
+            this.log(`Ding playback failed: ${err.message}`);
+            return;
+          }
+          const errText = stderr?.toString().trim();
+          if (errText) {
+            this.log(`Ding playback stderr: ${errText}`);
+          }
+        },
+      );
       return;
     }
     const volumePct = getConfig().volume;
@@ -137,15 +151,22 @@ export class SoundPlayer {
   }
 
   private startWindowsLoop(soundFile: string): void {
-    // Always use MediaPlayer via play-loop.ps1 on Windows. ffplay is detached + unref'd
-    // and can outlive the extension host if stop hooks never fire (e.g. ref-count leak).
+    // Detached PowerShell children exit immediately on Windows when using WPF
+    // MediaPlayer (no audio, process gone in <1s). Keep the child attached to
+    // this extension host and stop it explicitly via stopHoldLoop().
     const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'hooks', 'play-loop.ps1').fsPath;
     const volume = String(getConfig().volume);
     const child = spawn(
       'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, soundFile, volume],
-      { detached: true, stdio: 'ignore', windowsHide: true },
+      ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, soundFile, volume],
+      { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true },
     );
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString().trim();
+      if (text) {
+        this.log(`Hold loop stderr: ${text}`);
+      }
+    });
     this.trackLoopChild(child);
   }
 
@@ -161,21 +182,23 @@ export class SoundPlayer {
 
   private trackLoopChild(child: ChildProcess): void {
     child.on('error', (err) => {
-      console.warn('[Elevator Music] Hold loop spawn failed:', err.message);
+      this.log(`Hold loop spawn failed: ${err.message}`);
       if (this.loopProcess === child) {
         this.loopProcess = null;
         this.loopPid = undefined;
         void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
       }
     });
-    child.on('exit', () => {
+    child.on('exit', (code, signal) => {
       if (this.loopProcess === child) {
+        if (code !== 0 && code !== null) {
+          this.log(`Hold loop exited early (code ${code}, signal ${signal ?? 'none'})`);
+        }
         this.loopProcess = null;
         this.loopPid = undefined;
         void this.context.globalState.update(LOOP_PID_STATE_KEY, undefined);
       }
     });
-    child.unref();
     this.loopProcess = child;
     this.loopPid = child.pid;
     if (child.pid !== undefined) {
@@ -202,6 +225,7 @@ export class SoundPlayer {
       detached: true,
       stdio: 'ignore',
     });
+    child.unref();
     this.trackLoopChild(child);
   }
 

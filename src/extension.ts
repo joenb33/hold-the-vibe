@@ -125,6 +125,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const diagnostics = new Diagnostics();
   soundPlayer = new SoundPlayer(context);
+  soundPlayer.setPlaybackLogger((message) => outputChannel?.appendLine(message));
   soundPlayer.cleanupOrphanedLoop();
   const dingCoordinator = new DingCoordinator(soundPlayer, diagnostics);
   musicController = new MusicController(soundPlayer, dingCoordinator, diagnostics);
@@ -176,7 +177,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         `Elevator Music stopped automatically after ${maxMin} minutes.`,
       );
       refreshStatusBar();
+      return;
     }
+
+    // Hooks can show "playing" via ref-count even if the Windows loop process died.
+    musicController?.recoverHoldLoopIfNeeded();
   };
 
   refreshStatusBar();
