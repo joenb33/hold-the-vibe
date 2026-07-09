@@ -12,24 +12,23 @@ This project uses GitHub Actions for build, release, and (optional) marketplace 
 
 ## Ship a new version
 
-### 1. Bump version locally
+Push to `main`. CI handles the rest:
 
-Edit `version` in `package.json` (semver: `0.1.0` → `0.1.1`).
+1. If `package.json`'s version **already has** a `v*` tag (the last release), CI auto-bumps the **patch** version (`0.1.3` → `0.1.4`) and pushes that commit.
+2. The next CI run (triggered by the bump commit) builds, tests, packages the VSIX, tags `v{version}`, and creates a GitHub Release when one does not exist yet.
+
+You only need to bump **minor** or **major** yourself when you want a bigger semver step.
+
+### Manual version bump (optional)
+
+Edit `version` in `package.json` when you want a minor/major release:
 
 ```bash
 npm run compile   # sanity check
-git add package.json
-git commit -m "chore: bump version to 0.1.1"
+git add package.json package-lock.json
+git commit -m "chore: bump version to 0.2.0"
 git push origin main
 ```
-
-### 2. Push to main (tag + release are automatic)
-
-```bash
-git push origin main
-```
-
-CI on `main` runs tests and, if green, creates tag `v{version}` and a GitHub Release when that release does not exist yet (including attaching `elevator-music-{version}.vsix`).
 
 To tag manually instead:
 
@@ -55,12 +54,13 @@ git push origin v0.1.3
 ## Version rules
 
 - Tag **must** match `package.json`: tag `v0.1.0` ↔ `"version": "0.1.0"`.
-- CI auto-tags on `main` when the version in `package.json` has no matching `v*` tag yet — you still bump semver intentionally in `package.json`.
+- CI auto-bumps the **patch** on `main` when that version is already tagged, then the follow-up run tags and releases.
+- Bump **minor** or **major** manually in `package.json` when you want a deliberate semver jump.
 - Pre-release tags (`v0.2.0-beta.1`) mark GitHub releases as pre-release.
 
-## Why not auto-bump the version number on every push?
+## Why patch auto-bump?
 
-Automatic version bumps on every commit create noisy releases and make semver meaningless. You still control the version in `package.json`; CI only creates the matching tag and release once that version lands on `main`.
+Patch auto-bump keeps every `main` push releasable without remembering to edit `package.json`. You still control minor/major semver intentionally; CI only handles the patch step when the current version is already shipped.
 
 ## Badges
 
